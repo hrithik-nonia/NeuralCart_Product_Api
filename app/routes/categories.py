@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request, Depends, status, Query
 from app.utils.limiter import limiter
-from app.models.category import CategoryCreate, CategoryResponse
+from app.models.category import CategoryCreate, CategoryResponse, CategoryUpdate
 from app.utils.dependency import get_current_user
 from app.database import categories_collection
 from datetime import datetime, timezone
@@ -63,7 +63,7 @@ async def create_category(request: Request, category_data: CategoryCreate, user=
 
 # Get Categories
 @router.get("/categories", status_code= status.HTTP_200_OK)
-@limiter.limit("20000/minute")
+@limiter.limit("20/minute")
 async def get_categories(request: Request,
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
@@ -146,7 +146,7 @@ async def get_categories(request: Request,
 
 # Get Category
 @router.get("/categories/{category_id}", status_code= status.HTTP_200_OK)
-@limiter.limit("20000/minute")
+@limiter.limit("20/minute")
 async def get_category(request: Request, category_id: str)-> CategoryResponse:
   # Redis Key Banao
   cache_key = f"category:{category_id}"
@@ -193,10 +193,78 @@ async def get_category(request: Request, category_id: str)-> CategoryResponse:
 
 
 # Edit Category
-@router.patch("/categories/{id}", status_code= status.HTTP_200_OK)
+@router.patch("/categories/{category_id}", status_code= status.HTTP_200_OK)
 @limiter.limit("5/minute")
-async def edit_category(request: Request):
-  return "edit cat"
+async def edit_category(request: Request, category_id: str, category_data: CategoryUpdate, user= Depends(get_current_user))-> CategoryResponse:
+   # 1. Admin check
+  if user.get("role") != "admin":
+      raise HTTPException(
+          status_code=status.HTTP_403_FORBIDDEN,
+          detail="Admin access required"
+      )
+    
+  # 2. Validate ID
+  try:
+      obj_id = ObjectId(category_id)
+  except Exception:
+      raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail="Invalid category ID"
+      )
+    
+  # 3. Only supplied fields
+  update_data = category_data.model_dump(exclude_unset=True)
+
+  if not update_data:
+      raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail="At least one field is required"
+      )
+      
+  # 4. Fetch category once
+  category = await categories_collection.find_one({"_id": obj_id})
+
+  if not category:
+      raise HTTPException(
+          status_code=status.HTTP_404_NOT_FOUND,
+          detail="Category not found"
+      )
+      
+  # 5. Prepare update
+  if "name" in update_data:
+      name = update_data["name"].strip()
+
+      if not name:
+          raise HTTPException(
+              status_code=status.HTTP_400_BAD_REQUEST,
+              detail="Category name cannot be empty"
+          )
+
+      update_data["name"] = name.title()
+      update_data["slug"] = name.lower().replace(" ", "-")
+
+    
+  # 6. Update MongoDB
+  await categories_collection.update_one(
+      {"_id": obj_id},
+      {"$set": update_data}
+  )
+
+  # 7. Update local object; no second DB query
+  category.update(update_data)
+      
+  # 8. Clear Redis cache
+  await shared_redis.delete(f"category:{category_id}")
+
+  # 9. Return response from local data
+  return CategoryResponse(
+      id=str(category["_id"]),
+      name=category["name"],
+      slug=category["slug"],
+      description=category.get("description"),
+      is_active=category["is_active"],
+      created_at=category["created_at"]
+  )
 
 
 # Delete Category
