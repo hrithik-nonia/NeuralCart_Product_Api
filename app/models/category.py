@@ -19,3 +19,7 @@ class CategoryResponse(BaseModel):
     description: Optional[str] = None
     is_active: bool
     created_at: datetime
+    
+class CategoryDeleteResponse(BaseModel):
+    message: str
+    name: str

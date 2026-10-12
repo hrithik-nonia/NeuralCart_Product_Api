@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request, Depends, status, Query
 from app.utils.limiter import limiter
-from app.models.category import CategoryCreate, CategoryResponse, CategoryUpdate
+from app.models.category import CategoryCreate, CategoryResponse, CategoryUpdate, CategoryDeleteResponse
 from app.utils.dependency import get_current_user
 from app.database import categories_collection
 from datetime import datetime, timezone
@@ -196,7 +196,7 @@ async def get_category(request: Request, category_id: str)-> CategoryResponse:
 @router.patch("/categories/{category_id}", status_code= status.HTTP_200_OK)
 @limiter.limit("5/minute")
 async def edit_category(request: Request, category_id: str, category_data: CategoryUpdate, user= Depends(get_current_user))-> CategoryResponse:
-   # 1. Admin check
+  # 1. Admin check
   if user.get("role") != "admin":
       raise HTTPException(
           status_code=status.HTTP_403_FORBIDDEN,
@@ -268,7 +268,46 @@ async def edit_category(request: Request, category_id: str, category_data: Categ
 
 
 # Delete Category
-@router.delete("/categories/{id}", status_code= status.HTTP_200_OK)
+@router.delete("/categories/{category_id}", status_code= status.HTTP_200_OK)
 @limiter.limit("5/minute")
-async def delete_category(request: Request):
-  return "delete cat"
+async def delete_category(request: Request, category_id: str, user= Depends(get_current_user))-> CategoryDeleteResponse:
+  # 1. Admin check
+  if user.get("role") != "admin":
+      raise HTTPException(
+          status_code=status.HTTP_403_FORBIDDEN,
+          detail="Admin access required"
+      )
+    
+  # 2. Validate ID
+  try:
+      obj_id = ObjectId(category_id)
+  except Exception:
+      raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail="Invalid category ID"
+      )
+      
+  # 3. Fetch category once
+  category = await categories_collection.find_one(
+    {"_id": obj_id},
+    {"name": 1},
+    )
+  
+  if not category:
+    raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail= "Category Not Found")
+  
+  # 4. Delete from MongoDB
+  await categories_collection.delete_one(
+      {"_id": obj_id}
+  )
+  
+  # 5. Delete Redis cache
+  await shared_redis.delete(f"category:{category_id}")
+  
+  # 6. Return response
+  return CategoryDeleteResponse(
+    message="Category deleted successfully",
+    name=category["name"]
+  )
+  
+  
