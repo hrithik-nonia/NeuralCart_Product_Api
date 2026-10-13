@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status, HTTPException, Request, Depends, Query
 from app.utils.limiter import limiter
 from app.utils.dependency import get_current_user
-from app.models.product_model import ProductCreate, ProductResponse, CategoryInfo
+from app.models.product_model import ProductCreate, ProductResponse, CategoryInfo, UpdateProduct
 from app.database import products_collection, categories_collection
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -279,14 +279,129 @@ async def get_product_by_id(request: Request, product_id: str) -> ProductRespons
     
 
 # Edit Product
-# @router.patch("/products/{product_id}", status_code=status.HTTP_200_OK)
-# @limiter.limit("5/minute")
-# async def edit_product(request: Request, product_id: str)-> dict | None:
-#     pass
+@router.patch("/products/{product_id}", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
+async def edit_product(
+    request: Request,
+    product_id: str,
+    product_data: UpdateProduct,
+    user: dict = Depends(get_current_user)
+) -> dict | None:
+
+    # 1. Admin check
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    # 2. Incoming data check
+    update_data = product_data.model_dump(exclude_unset=True, exclude_none=True)
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kuch bhi update karne ke liye bhejo"
+        )
+
+    # 3. Valid ObjectId check
+    try:
+        obj_id = ObjectId(product_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid product id"
+        )
+
+    # 4. String fields strip karo
+    if "name" in update_data:
+        update_data["name"] = update_data["name"].strip()
+    if "description" in update_data:
+        update_data["description"] = update_data["description"].strip()
+
+    # 5. images HttpUrl → string convert karo
+    if "images" in update_data:
+        update_data["images"] = [str(img) for img in update_data["images"]]
+
+    # 6. category_id validate karo agar aa raha hai
+    if "category_id" in update_data:
+        try:
+            cat_obj_id = ObjectId(update_data["category_id"])
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid category_id"
+            )
+        # Redis se check karo
+        cached_cat = await shared_redis.get(f"category:{update_data['category_id']}")
+        if not cached_cat:
+            category = await categories_collection.find_one(
+                {"_id": cat_obj_id, "is_active": True},
+                {"_id": 1}
+            )
+            if not category:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Category nahi mili ya inactive hai"
+                )
+        update_data["category_id"] = cat_obj_id
+
+    # 7. DB update karo
+    result = await products_collection.update_one(
+        {"_id": obj_id},
+        {"$set": update_data}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product nahi mila"
+        )
+
+    # 8. Cache invalidate karo
+    await shared_redis.delete(f"product:{product_id}")
+    async for key in shared_redis.scan_iter("products:*"):
+        await shared_redis.delete(key)
+
+    return {"message": "Product updated Successfully"}
 
 
 # Delete Product
-# @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-# @limiter.limit("10/minute")
-# async def delete_product(request: Request, product_id: str)-> dict | None:
-#     pass
+@router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute")
+async def delete_product(
+    request: Request,
+    product_id: str,
+    user: dict = Depends(get_current_user)
+)-> None:
+    # 1. Admin check
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    # 2. Valid ObjectId check
+    try:
+        obj_id = ObjectId(product_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid product id"
+        )
+
+    # 3. DB se delete karo
+    result = await products_collection.delete_one({"_id": obj_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product nahi mila"
+        )
+
+    # 4. Cache invalidate karo
+    await shared_redis.delete(f"product:{product_id}")
+    async for key in shared_redis.scan_iter("products:*"):
+        await shared_redis.delete(key)
+        
+        
+        

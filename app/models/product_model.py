@@ -27,3 +27,12 @@ class ProductResponse(BaseModel):
     category: Optional[CategoryInfo] = None
     is_active: bool
     created_at: datetime
+    
+class UpdateProduct(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    description: Optional[str] = None
+    price: Optional[float] = Field(None, gt=0)
+    stock: Optional[int] = Field(None, ge=0)
+    images: Optional[list[HttpUrl]] = None
+    category_id: Optional[str] = None
+    is_active: Optional[bool] = None

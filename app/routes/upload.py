@@ -33,6 +33,7 @@ async def upload_product_image(
           detail="Sirf JPEG, PNG, WEBP allowed hai",
       )
       
+      
   # File bytes pado
   file_bytes = await file.read()
   
@@ -43,12 +44,14 @@ async def upload_product_image(
           detail="File size 5MB se zyada nahi honi chahiye",
       )
       
+      
   # Empty file check
   if len(file_bytes) == 0:
       raise HTTPException(
           status_code=status.HTTP_400_BAD_REQUEST,
           detail="Empty file nahi chalega",
       )
+      
       
   # compressed image
   file_bytes = await compress_image(file_bytes)
