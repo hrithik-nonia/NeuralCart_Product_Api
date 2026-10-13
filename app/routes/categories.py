@@ -189,7 +189,7 @@ async def get_category(request: Request, category_id: str)-> CategoryResponse:
     15 * 60,  # 1 hour
     json.dumps(result.model_dump(), default=str)
   )
-  return "get category"
+  return result
 
 
 # Edit Category

@@ -20,7 +20,6 @@ async def lifespan(app: FastAPI):
     print("✅ Redis connected")
 
     # Indexes
-    await products_collection.create_index("slug", unique=True)
     await categories_collection.create_index("slug", unique=True)
     print("✅ Indexes created")
 
