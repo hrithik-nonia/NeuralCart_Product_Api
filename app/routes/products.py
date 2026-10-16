@@ -89,7 +89,7 @@ async def create_product(
     
     
 # Get Products
-@router.get("/products", status_code=status.HTTP_200_OK)
+@router.get("/all", status_code=status.HTTP_200_OK)
 @limiter.limit("20/minute")
 async def products(request: Request, 
   page: int = Query(default=1, ge=1), 
@@ -186,7 +186,7 @@ async def products(request: Request,
 
 
 # Get Product By Id
-@router.get("/products/{product_id}", status_code=status.HTTP_200_OK)
+@router.get("/{product_id}", status_code=status.HTTP_200_OK)
 @limiter.limit("20/minute")
 async def get_product_by_id(request: Request, product_id: str) -> ProductResponse:
     
@@ -279,7 +279,7 @@ async def get_product_by_id(request: Request, product_id: str) -> ProductRespons
     
 
 # Edit Product
-@router.patch("/products/{product_id}", status_code=status.HTTP_200_OK)
+@router.patch("/{product_id}", status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")
 async def edit_product(
     request: Request,
@@ -366,7 +366,7 @@ async def edit_product(
 
 
 # Delete Product
-@router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("10/minute")
 async def delete_product(
     request: Request,

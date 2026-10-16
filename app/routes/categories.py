@@ -14,9 +14,9 @@ router = APIRouter(prefix="/category", tags=["Category APIs"],)
 
 
 # Create Category
-@router.post("/categories", status_code= status.HTTP_201_CREATED)
+@router.post("/create", status_code= status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
-async def create_category(request: Request, category_data: CategoryCreate, user= Depends(get_current_user))-> CategoryResponse:
+async def create_category(request: Request, category_data: CategoryCreate, user: dict = Depends(get_current_user))-> CategoryResponse:
   # Cheak, Only Admin Allow
   if user.get("role") != "admin":
     raise HTTPException(
@@ -62,7 +62,7 @@ async def create_category(request: Request, category_data: CategoryCreate, user=
 
 
 # Get Categories
-@router.get("/categories", status_code= status.HTTP_200_OK)
+@router.get("/all", status_code= status.HTTP_200_OK)
 @limiter.limit("20/minute")
 async def get_categories(request: Request,
     page: int = Query(default=1, ge=1),
@@ -145,7 +145,7 @@ async def get_categories(request: Request,
 
 
 # Get Category
-@router.get("/categories/{category_id}", status_code= status.HTTP_200_OK)
+@router.get("/{category_id}", status_code= status.HTTP_200_OK)
 @limiter.limit("20/minute")
 async def get_category(request: Request, category_id: str)-> CategoryResponse:
   # Redis Key Banao
@@ -193,9 +193,9 @@ async def get_category(request: Request, category_id: str)-> CategoryResponse:
 
 
 # Edit Category
-@router.patch("/categories/{category_id}", status_code= status.HTTP_200_OK)
+@router.patch("/{category_id}", status_code= status.HTTP_200_OK)
 @limiter.limit("5/minute")
-async def edit_category(request: Request, category_id: str, category_data: CategoryUpdate, user= Depends(get_current_user))-> CategoryResponse:
+async def edit_category(request: Request, category_id: str, category_data: CategoryUpdate, user: dict = Depends(get_current_user))-> CategoryResponse:
   # 1. Admin check
   if user.get("role") != "admin":
       raise HTTPException(
@@ -268,9 +268,9 @@ async def edit_category(request: Request, category_id: str, category_data: Categ
 
 
 # Delete Category
-@router.delete("/categories/{category_id}", status_code= status.HTTP_200_OK)
+@router.delete("/{category_id}", status_code= status.HTTP_200_OK)
 @limiter.limit("5/minute")
-async def delete_category(request: Request, category_id: str, user= Depends(get_current_user))-> CategoryDeleteResponse:
+async def delete_category(request: Request, category_id: str, user: dict = Depends(get_current_user))-> CategoryDeleteResponse:
   # 1. Admin check
   if user.get("role") != "admin":
       raise HTTPException(
