@@ -8,6 +8,8 @@ from app.redis import shared_redis
 from app.routes.categories import router as category_router
 from app.routes.products import router as product_router
 from app.routes.upload import router as upload_router
+import asyncio
+from app.kafka.consumer import start_consumer
 
 
 @asynccontextmanager
@@ -18,6 +20,10 @@ async def lifespan(app: FastAPI):
     
     await shared_redis.ping()       # ← add karo
     print("✅ Redis connected")
+    
+    # Kafka consumer background mein chalao
+    consumer_task = asyncio.create_task(start_consumer())
+    print("✅ Kafka consumer started")
 
     # Indexes
     await categories_collection.create_index("slug", unique=True)
@@ -25,6 +31,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    consumer_task.cancel()
     client.close()
     print("🔴 MongoDB disconnected")
 
