@@ -10,6 +10,7 @@ from app.routes.products import router as product_router
 from app.routes.upload import router as upload_router
 import asyncio
 from app.kafka.consumer import start_consumer
+from app.kafka.producer import start_producer, stop_producer
 
 
 @asynccontextmanager
@@ -28,12 +29,20 @@ async def lifespan(app: FastAPI):
     # Indexes
     await categories_collection.create_index("slug", unique=True)
     print("✅ Indexes created")
+    
+    # Kafka producer start karo
+    await start_producer()
+    print("✅ Kafka producer started")
 
     yield
 
+    await stop_producer()
     consumer_task.cancel()
     client.close()
     print("🔴 MongoDB disconnected")
+    print("🔴 Redis disconnected")
+    print("🔴 Kafka consumer stopped")
+    print("🔴 Kafka producer stopped")
 
 
 app = FastAPI(

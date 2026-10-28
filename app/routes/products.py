@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, HTTPException, Request, Depends, Query
 from app.utils.limiter import limiter
-from app.utils.dependency import get_current_user
+from app.utils.dependency import get_current_user, get_optional_user
 from app.models.product_model import ProductCreate, ProductResponse, CategoryInfo, UpdateProduct
 from app.database import products_collection, categories_collection
 from bson import ObjectId
@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from app.redis import shared_redis
 import json
 from typing import Optional
+from app.kafka.producer import publish_product_view
 
 router = APIRouter(prefix="/product", tags=["Product APIs"])
 
@@ -188,10 +189,14 @@ async def products(request: Request,
 # Get Product By Id
 @router.get("/{product_id}", status_code=status.HTTP_200_OK)
 @limiter.limit("20/minute")
-async def get_product_by_id(request: Request, product_id: str) -> ProductResponse:
+async def get_product_by_id(request: Request, product_id: str, user: dict | None = Depends(get_optional_user)) -> ProductResponse:
     
     # 1. Cache key
     cache_key = f"product:{product_id}"
+    
+    # Kafka event publish karo agar user logged in hai
+    if user:
+        await publish_product_view(user.get("id"), product_id)
     
     # 2. Redis check
     cached = await shared_redis.get(cache_key)

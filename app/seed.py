@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGO_URL = os.getenv("MONGO_URI")
+MONGO_URL = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("DATABASE_NAME")
 
 client = AsyncIOMotorClient(MONGO_URL)
@@ -21,7 +21,7 @@ PRODUCTS = ["Shirt", "Laptop", "Phone", "Watch", "Shoes", "Bag", "Camera", "Chai
 BRANDS = ["Nike", "Apple", "Samsung", "Sony", "Puma", "Dell", "HP", "LG"]
 
 BATCH_SIZE = 1000  # ek baar mein 1000 insert
-TOTAL = 1000000
+TOTAL = 100000
 
 
 async def get_categories():

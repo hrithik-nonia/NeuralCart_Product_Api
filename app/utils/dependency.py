@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 from dotenv import load_dotenv
@@ -65,3 +65,25 @@ async def get_current_user(
         raise credentials_exception
 
     return response.json()
+
+
+
+async def get_optional_user(
+    creds: HTTPAuthorizationCredentials | None = Security(HTTPBearer(auto_error=False)),
+) -> dict | None:
+    if not creds:
+        return None
+    try:
+        payload = pyjwt.decode(creds.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "access":
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        # Redis check
+        cached = await shared_redis.get(f"user:{user_id}")
+        if cached:
+            return json.loads(cached)
+        return {"id": user_id}
+    except Exception:
+        return None

@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 load_dotenv()
 
 # mongodb client create kiya
-client = AsyncIOMotorClient(os.getenv("MONGO_URI"),
+client = AsyncIOMotorClient(os.getenv("MONGODB_URI"),
                             maxPoolSize=50,   # connection pool added
                             minPoolSize=10,
                             maxIdleTimeMS=60000,
