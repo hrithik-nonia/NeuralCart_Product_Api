@@ -10,6 +10,7 @@ from app.redis import shared_redis
 import json
 from typing import Optional
 from app.kafka.producer import publish_product_view
+from app.utils.embeddings import generate_embedding
 
 router = APIRouter(prefix="/product", tags=["Product APIs"])
 
@@ -67,6 +68,10 @@ async def create_product(
 
     # 4. User id nikalo
     created_by = user.get("id")
+    
+    # new_product banane se pehle
+    text = f"{name} {description or ''}"
+    embedding = await generate_embedding(text)
 
     # 5. DB mein save karo
     new_product = {
@@ -79,6 +84,7 @@ async def create_product(
         "is_active": product_data.is_active,
         "created_by": created_by,
         "created_at": datetime.now(timezone.utc),
+        "embedding": embedding,
     }
 
     result = await products_collection.insert_one(new_product)
